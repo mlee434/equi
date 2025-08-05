@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shakespeare RAG Chatbot Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 800px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #8B4513, #D2691E);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .chat-header h1 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .chat-header p {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+
+        .status-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            transition: background 0.3s ease;
+        }
+
+        .status-indicator.connected {
+            background: #44ff44;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .message.user {
+            text-align: right;
+        }
+
+        .message-bubble {
+            display: inline-block;
+            max-width: 70%;
+            padding: 12px 18px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            position: relative;
+        }
+
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-bottom-right-radius: 6px;
+        }
+
+        .message.assistant .message-bubble {
+            background: white;
+            color: #333;
+            border: 1px solid #e1e5e9;
+            border-bottom-left-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .message-timestamp {
+            font-size: 0.75em;
+            opacity: 0.6;
+            margin-top: 5px;
+        }
+
+        .message.user .message-timestamp {
+            text-align: right;
+        }
+
+        .message.assistant .message-timestamp {
+            text-align: left;
+        }
+
+        .chat-input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e1e5e9;
+        }
+
+        .chat-input-form {
+            display: flex;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .chat-input {
+            flex: 1;
+            border: 2px solid #e1e5e9;
+            border-radius: 25px;
+            padding: 12px 20px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s ease;
+            resize: none;
+            min-height: 20px;
+            max-height: 100px;
+            font-family: inherit;
+        }
+
+        .chat-input:focus {
+            border-color: #667eea;
+        }
+
+        .send-button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            font-size: 1.2em;
+        }
+
+        .send-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 18px;
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-radius: 18px;
+            border-bottom-left-radius: 6px;
+            max-width: 70%;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #999;
+            animation: typingDot 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        .error-message {
+            background: #ffe6e6;
+            color: #d8000c;
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border-left: 4px solid #d8000c;
+            animation: shake 0.5s ease-in-out;
+        }
+
+        .sample-questions {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e1e5e9;
+        }
+
+        .sample-questions h3 {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .sample-question {
+            display: inline-block;
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-radius: 15px;
+            padding: 8px 12px;
+            margin: 3px;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .sample-question:hover {
+            background: #f0f0f0;
+            border-color: #667eea;
+        }
+
+        .clear-button {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s ease;
+            margin-left: 10px;
+        }
+
+        .clear-button:hover {
+            background: #ff5252;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes typingDot {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .chat-container {
+                height: 100vh;
+                border-radius: 0;
+            }
+            
+            .chat-header h1 {
+                font-size: 1.5em;
+            }
+            
+            .message-bubble {
+                max-width: 85%;
+            }
+        }
+
+        /* Scrollbar styling */
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🎭 Shakespeare RAG Chatbot</h1>
+            <p>Ask me anything about Shakespeare's plays, sonnets, and poems</p>
+            <div class="status-indicator" id="statusIndicator"></div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+                <div class="message-bubble">
+                    <div>Welcome! I'm your Shakespeare expert. I can answer questions about his plays, characters, themes, sonnets, and poems. What would you like to know?</div>
+                </div>
+                <div class="message-timestamp">Just now</div>
+            </div>
+            
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+                <span>Shakespeare Bot is thinking...</span>
+            </div>
+        </div>
+
+        <div class="sample-questions">
+            <h3>💡 Try asking:</h3>
+            <div class="sample-question" onclick="sendSampleQuestion('What themes appear in Hamlet?')">What themes appear in Hamlet?</div>
+            <div class="sample-question" onclick="sendSampleQuestion('Tell me about Lady Macbeth')">Tell me about Lady Macbeth</div>
+            <div class="sample-question" onclick="sendSampleQuestion('Who are the lovers in Romeo and Juliet?')">Who are the lovers in Romeo and Juliet?</div>
+            <div class="sample-question" onclick="sendSampleQuestion('What is the significance of the balcony scene?')">What is the significance of the balcony scene?</div>
+            <div class="sample-question" onclick="sendSampleQuestion('Analyze Sonnet 18')">Analyze Sonnet 18</div>
+            <button class="clear-button" onclick="clearConversation()">🗑️ Clear Chat</button>
+        </div>
+
+        <div class="chat-input-container">
+            <form class="chat-input-form" onsubmit="sendMessage(event)">
+                <textarea 
+                    class="chat-input" 
+                    id="messageInput" 
+                    placeholder="Ask about Shakespeare's works..."
+                    rows="1"
+                    onkeydown="handleKeyDown(event)"
+                ></textarea>
+                <button type="submit" class="send-button" id="sendButton">
+                    <span>📤</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE_URL = 'http://localhost:8000';
+        
+        // State
+        let isLoading = false;
+        let conversationHistory = [];
+
+        // DOM elements
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const typingIndicator = document.getElementById('typingIndicator');
+        const statusIndicator = document.getElementById('statusIndicator');
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAPIHealth();
+            adjustTextareaHeight();
+            messageInput.addEventListener('input', adjustTextareaHeight);
+        });
+
+        // Check API health
+        async function checkAPIHealth() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const health = await response.json();
+                
+                if (health.status === 'healthy') {
+                    statusIndicator.classList.add('connected');
+                    statusIndicator.title = 'Connected to Shakespeare Bot';
+                } else {
+                    statusIndicator.classList.remove('connected');
+                    statusIndicator.title = 'Bot unavailable';
+                }
+            } catch (error) {
+                statusIndicator.classList.remove('connected');
+                statusIndicator.title = 'Connection failed';
+                console.error('Health check failed:', error);
+            }
+        }
+
+        // Handle textarea auto-resize
+        function adjustTextareaHeight() {
+            messageInput.style.height = 'auto';
+            messageInput.style.height = Math.min(messageInput.scrollHeight, 100) + 'px';
+        }
+
+        // Handle keyboard shortcuts
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage(event);
+            }
+        }
+
+        // Send message
+        async function sendMessage(event) {
+            console.log('sendMessage called!', event);
+            event.preventDefault();
+            
+            const message = messageInput.value.trim();
+            console.log('Message value:', message);
+            
+            if (!message || isLoading) {
+                console.log('Returning early - no message or loading');
+                return;
+            }
+
+            console.log('Proceeding to send message');
+
+            // Add user message to chat
+            addMessage('user', message);
+            messageInput.value = '';
+            adjustTextareaHeight();
+
+            // Send to API
+            await sendToAPI(message);
+        }
+
+        // Send sample question
+        function sendSampleQuestion(question) {
+            if (isLoading) return;
+            
+            addMessage('user', question);
+            sendToAPI(question);
+        }
+
+        // Send to Shakespeare API
+        async function sendToAPI(message) {
+            isLoading = true;
+            updateLoadingState(true);
+
+            console.log('Sending message to API:', message);
+            console.log('API URL:', `${API_BASE_URL}/chat`);
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: message })
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API error response:', errorText);
+                    throw new Error(`API error: ${response.status} - ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('API response data:', data);
+                addMessage('assistant', data.response);
+
+            } catch (error) {
+                console.error('Error sending message:', error);
+                addErrorMessage(`Error: ${error.message}. Please check that the Shakespeare API is running on ${API_BASE_URL}`);
+            } finally {
+                isLoading = false;
+                updateLoadingState(false);
+            }
+        }
+
+        // Add message to chat
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            
+            messageDiv.innerHTML = `
+                <div class="message-bubble">
+                    <div>${escapeHtml(content)}</div>
+                </div>
+                <div class="message-timestamp">${timestamp}</div>
+            `;
+
+            // Insert before typing indicator
+            chatMessages.insertBefore(messageDiv, typingIndicator);
+            scrollToBottom();
+
+            // Store in history
+            conversationHistory.push({ role, content, timestamp });
+        }
+
+        // Add error message
+        function addErrorMessage(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            
+            chatMessages.insertBefore(errorDiv, typingIndicator);
+            scrollToBottom();
+        }
+
+        // Update loading state
+        function updateLoadingState(loading) {
+            sendButton.disabled = loading;
+            
+            if (loading) {
+                typingIndicator.style.display = 'flex';
+                sendButton.innerHTML = '<span>⏳</span>';
+            } else {
+                typingIndicator.style.display = 'none';
+                sendButton.innerHTML = '<span>📤</span>';
+            }
+            
+            scrollToBottom();
+        }
+
+        // Clear conversation
+        function clearConversation() {
+            if (confirm('Are you sure you want to clear the conversation?')) {
+                // Remove all messages except the welcome message
+                const messages = chatMessages.querySelectorAll('.message:not(:first-child), .error-message');
+                messages.forEach(msg => msg.remove());
+                
+                conversationHistory = [];
+                console.log('Conversation cleared');
+            }
+        }
+
+        // Utility functions
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Periodically check API health
+        setInterval(checkAPIHealth, 30000); // Check every 30 seconds
+    </script>
+</body>
+</html>
