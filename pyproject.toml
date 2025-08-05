@@ -1,0 +1,10 @@
+[project]
+name = "equi"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "beautifulsoup4>=4.13.4",
+    "weaviate-client>=4.16.5",
+]
