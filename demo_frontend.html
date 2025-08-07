@@ -547,14 +547,43 @@
         }
 
         // Clear conversation
-        function clearConversation() {
+        async function clearConversation() {
             if (confirm('Are you sure you want to clear the conversation?')) {
-                // Remove all messages except the welcome message
-                const messages = chatMessages.querySelectorAll('.message:not(:first-child), .error-message');
-                messages.forEach(msg => msg.remove());
-                
-                conversationHistory = [];
-                console.log('Conversation cleared');
+                try {
+                    // Call API to clear server-side conversation history
+                    const response = await fetch(`${API_BASE_URL}/conversation`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    if (response.ok) {
+                        // Remove all messages except the welcome message
+                        const messages = chatMessages.querySelectorAll('.message:not(:first-child), .error-message');
+                        messages.forEach(msg => msg.remove());
+                        
+                        conversationHistory = [];
+                        console.log('Conversation cleared on both client and server');
+                        
+                        // Show confirmation message
+                        const clearDiv = document.createElement('div');
+                        clearDiv.className = 'message assistant';
+                        clearDiv.innerHTML = `
+                            <div class="message-bubble">
+                                <div>Conversation history has been cleared. Feel free to start a new conversation!</div>
+                            </div>
+                            <div class="message-timestamp">${new Date().toLocaleTimeString()}</div>
+                        `;
+                        chatMessages.insertBefore(clearDiv, typingIndicator);
+                        scrollToBottom();
+                    } else {
+                        throw new Error(`Failed to clear conversation: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Error clearing conversation:', error);
+                    addErrorMessage(`Failed to clear conversation: ${error.message}`);
+                }
             }
         }
 

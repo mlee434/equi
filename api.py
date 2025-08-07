@@ -6,7 +6,7 @@ Simplified demo API with just a chat endpoint.
 from datetime import datetime
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -15,7 +15,7 @@ from rich.console import Console
 
 console = Console()
 
-# Global variable for the core processor
+# Global variables
 core_processor = None
 
 
@@ -34,8 +34,6 @@ class HealthResponse(BaseModel):
     """Health check response"""
     status: str
     timestamp: datetime
-    weaviate_connected: bool
-    openai_available: bool
 
 
 async def initialize_shakespeare_bot():
@@ -44,15 +42,8 @@ async def initialize_shakespeare_bot():
     
     console.print("🎭 Initializing Shakespeare RAG API...", style="blue")
     core_processor = ShakespeareCoreProcessor()
-    
-    if not core_processor.initialize():
-        console.print("❌ Failed to initialize Shakespeare RAG system", style="red")
-        raise RuntimeError("Failed to initialize Shakespeare RAG system")
-    
+    core_processor.initialize()
     console.print("✅ Shakespeare RAG API initialized successfully!", style="green")
-
-
-
 
 
 @asynccontextmanager
@@ -82,7 +73,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Configure this appropriately for production
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -90,15 +81,18 @@ app.add_middleware(
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
-    if not core_processor:
-        raise HTTPException(status_code=503, detail="Shakespeare RAG system not initialized")
-    
     return HealthResponse(
         status="healthy",
-        timestamp=datetime.now(),
-        weaviate_connected=core_processor._connected,
-        openai_available=core_processor.ai_client.is_available()
+        timestamp=datetime.now()
     )
+
+
+@app.delete("/conversation")
+async def clear_conversation():
+    """Clear the conversation history"""
+    core_processor.clear_conversation_history()
+    
+    return {"message": "Conversation history cleared", "timestamp": datetime.now()}
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -106,32 +100,15 @@ async def chat(request: QueryRequest):
     """
     Process a chat query and return a response.
     
-    Each request is independent - no session management for demo purposes.
+    Conversation history is managed by the core processor.
     """
-    if not core_processor:
-        raise HTTPException(status_code=503, detail="Shakespeare RAG system not initialized")
+    response = core_processor.process_query(
+        request.query,
+        use_smart_selection=True
+    )
     
-    try:
-        # Process the query without conversation history
-        response = core_processor.process_query(
-            request.query,
-            conversation_history=None,
-            use_smart_selection=True
-        )
-        
-        return ChatResponse(
-            response=response,
-            timestamp=datetime.now()
-        )
-        
-    except Exception as e:
-        console.print(f"❌ Error processing chat request: {e}", style="red")
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+    return ChatResponse(
+        response=response,
+        timestamp=datetime.now()
+    )
 
-
-
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)

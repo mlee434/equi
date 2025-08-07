@@ -13,19 +13,14 @@ from pathlib import Path
 import weaviate
 from weaviate.classes.config import Configure, Property, DataType
 from weaviate.classes.data import DataObject
-from typing import List, Dict, Any
+
 
 
 def connect_to_weaviate():
     """Connect to local Weaviate instance"""
-    try:
-        client = weaviate.connect_to_local()
-        print("✓ Connected to Weaviate")
-        return client
-    except Exception as e:
-        print(f"❌ Failed to connect to Weaviate: {e}")
-        print("Make sure Weaviate is running locally (docker-compose up)")
-        return None
+    client = weaviate.connect_to_local()
+    print("✓ Connected to Weaviate")
+    return client
 
 
 def create_collections(client):
@@ -320,43 +315,32 @@ def main():
     """Main execution function"""
     json_dir = "json_output"
     
-    if not os.path.exists(json_dir):
-        print(f"❌ Directory {json_dir} not found")
-        return
-    
     # Connect to Weaviate
     client = connect_to_weaviate()
-    if not client:
-        return
     
-    try:
-        # Create collections
-        print("\n🏗️  Creating collections...")
-        create_collections(client)
-        
-        # Load data
-        print("\n📚 Loading data...")
-        load_plays(client, json_dir)
-        load_sonnets(client, json_dir) 
-        load_poems(client, json_dir)
-        
-        # Verify results
-        verify_collections(client)
-        
-        print("\n🎉 Shakespeare data successfully loaded into Weaviate!")
-        print("\nYou can now query the collections:")
-        print("- ShakespearePlays: All dramatic works")
-        print("- ShakespeareSonnets: The 154 sonnets")  
-        print("- ShakespearePoems: Other poetry (Venus & Adonis, Rape of Lucrece, Lover's Complaint)")
-        print("\n📋 Prerequisites:")
-        print("- Ollama running with 'nomic-embed-text' and 'llama3.2' models")
-        print("- Run: ollama pull nomic-embed-text && ollama pull llama3.2")
-        
-    except Exception as e:
-        print(f"❌ Error during loading: {e}")
-        
-    finally:
-        client.close()
+    # Create collections
+    print("\n🏗️  Creating collections...")
+    create_collections(client)
+    
+    # Load data
+    print("\n📚 Loading data...")
+    load_plays(client, json_dir)
+    load_sonnets(client, json_dir) 
+    load_poems(client, json_dir)
+    
+    # Verify results
+    verify_collections(client)
+    
+    print("\n🎉 Shakespeare data successfully loaded into Weaviate!")
+    print("\nYou can now query the collections:")
+    print("- ShakespearePlays: All dramatic works")
+    print("- ShakespeareSonnets: The 154 sonnets")  
+    print("- ShakespearePoems: Other poetry (Venus & Adonis, Rape of Lucrece, Lover's Complaint)")
+    print("\n📋 Prerequisites:")
+    print("- Ollama running with 'nomic-embed-text' and 'llama3.2' models")
+    print("- Run: ollama pull nomic-embed-text && ollama pull llama3.2")
+    
+    client.close()
 
 
 if __name__ == "__main__":

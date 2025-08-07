@@ -3,12 +3,11 @@
 Convert Shakespeare plays from HTML to JSON format for vector database ingestion.
 """
 
-import os
 import json
 import re
 from pathlib import Path
 from bs4 import BeautifulSoup
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 
 
 def extract_play_metadata(soup: BeautifulSoup, play_id: str) -> Dict[str, Any]:
@@ -285,30 +284,21 @@ def parse_play_html(html_content: str, play_id: str) -> Dict[str, Any]:
     }
 
 
-def convert_play(play_dir: Path) -> Optional[Dict[str, Any]]:
+def convert_play(play_dir: Path) -> Dict[str, Any]:
     """Convert a single play directory to JSON."""
     full_html_path = play_dir / "full.html"
     
-    if not full_html_path.exists():
-        print(f"No full.html found in {play_dir}")
-        return None
+    with open(full_html_path, 'r', encoding='utf-8', errors='ignore') as f:
+        html_content = f.read()
     
-    try:
-        with open(full_html_path, 'r', encoding='utf-8', errors='ignore') as f:
-            html_content = f.read()
-        
-        play_id = play_dir.name
-        result = parse_play_html(html_content, play_id)
-        
-        print(f"Converted {play_id}: {result['play_metadata']['total_acts']} acts, "
-              f"{result['play_metadata']['total_scenes']} scenes, "
-              f"{len(result['chunks'])} chunks")
-        
-        return result
+    play_id = play_dir.name
+    result = parse_play_html(html_content, play_id)
     
-    except Exception as e:
-        print(f"Error processing {play_dir}: {e}")
-        return None
+    print(f"Converted {play_id}: {result['play_metadata']['total_acts']} acts, "
+          f"{result['play_metadata']['total_scenes']} scenes, "
+          f"{len(result['chunks'])} chunks")
+    
+    return result
 
 
 def main():
@@ -316,10 +306,6 @@ def main():
     shakespeare_dir = Path("shakespeare")
     output_dir = Path("json_output")
     output_dir.mkdir(exist_ok=True)
-    
-    if not shakespeare_dir.exists():
-        print("Shakespeare directory not found!")
-        return
     
     # Process each play directory
     for play_dir in shakespeare_dir.iterdir():
@@ -329,13 +315,12 @@ def main():
         print(f"Processing {play_dir.name}...")
         
         result = convert_play(play_dir)
-        if result:
-            # Save individual play JSON
-            output_file = output_dir / f"{play_dir.name}.json"
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(result, f, indent=2, ensure_ascii=False)
-            
-            print(f"Saved {output_file}")
+        # Save individual play JSON
+        output_file = output_dir / f"{play_dir.name}.json"
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(result, f, indent=2, ensure_ascii=False)
+        
+        print(f"Saved {output_file}")
     
     print("Conversion complete!")
 
